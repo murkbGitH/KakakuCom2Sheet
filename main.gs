@@ -15,6 +15,11 @@ var SHEET_NAME = "価格推移";
 function ranking2Sheet(){
   // Kimono APIへのリクエストを発行して結果を加工
   var response = request();
+  if (response.parseError) {
+    Logger.log("Kimonoからのデータ取得に失敗しました");
+    return
+  }
+
   var ranking  = process(response.crawlResults);
 
 
@@ -76,22 +81,35 @@ function ranking2Sheet(){
 }
 
 
-// Kimono API側でクローニングを開始させる
+// Kimono API側でクローリングを開始させる
 function startCrawl() {
-  // Kimono API側の仕様としてクローニングの開始はPOSTでリクエストを飛ばす決まりなので
+  // Kimono API側の仕様としてクローリングの開始はPOSTでリクエストを飛ばす決まりなので
   // API Keyはクエリ文字列ではなくpayload(e.g. POST body)として渡す必要がある
   var payload = {
     apikey: API_KEY
   };
 
-  return UrlFetchApp.fetch(START_CRAWL_URL, {
-    method: "post",
-    contentType: "application/json", // JSON形式で、これもKimono API側の仕様
-    muteHttpExceptions: true,
-    payload: JSON.stringify(payload)
-      // そのままUrlFetchApp.fetch()に渡すとkey/value mapに変換されてしまうので
-      // 事前にJSON.stringify()する
-  });
+  try {
+    var response = UrlFetchApp.fetch(START_CRAWL_URL, {
+      method: "post",
+      contentType: "application/json", // JSON形式で、これもKimono API側の仕様
+      muteHttpExceptions: true,
+      payload: JSON.stringify(payload)
+        // そのままUrlFetchApp.fetch()に渡すとkey/value mapに変換されてしまうので
+        // 事前にJSON.stringify()する
+    });
+    Logger.log(response);
+
+    return response;
+  } catch (e) {
+    Logger.log(e);
+
+    // エラーが起きたら10分後に再び実行
+    ScriptApp.newTrigger(arguments.callee.name)
+      .timeBased()
+      .after(10 * 60 * 1000)
+      .create();
+  }
 }
 
 
